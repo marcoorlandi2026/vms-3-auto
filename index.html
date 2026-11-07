@@ -40,6 +40,19 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
 .tile .l{color:var(--mut);font-size:10px;min-height:12px;white-space:nowrap}
 .tile.on{background:var(--c)}
 .tile.on .n,.tile.on .v,.tile.on .l{color:#0a1220}
+.top .gear{width:36px;padding:0;font-size:19px;line-height:1;background:transparent;color:var(--mut);border-color:#1e3050}
+.setpage{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;
+  padding:calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))}
+.setpage[hidden]{display:none}
+.setbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.setbar h2{margin:0;font-size:18px}
+.setbar button{background:#1a3560;color:var(--txt);border:1.5px solid #2d5096;border-radius:8px;font-size:14px;height:36px;padding:0 12px;font-family:inherit}
+.setcard{background:var(--card);border:1px solid #1e3050;border-radius:12px;padding:12px;margin-bottom:12px}
+.setopt{display:flex;gap:10px;align-items:flex-start;font-size:16px;font-weight:700;cursor:pointer}
+.setopt input{width:22px;height:22px;flex:none;margin:1px 0 0}
+.setnote{color:var(--mut);font-size:14px;margin:8px 0 0}
+.setcard h3{margin:0 0 6px;font-size:15px;color:var(--bright)}
+.helptxt{white-space:pre-line;font-size:14px;line-height:1.45}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:90vw;
   background:#222c3c;color:#fff;padding:8px 14px;border-radius:18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
 .toast.show{opacity:1}
@@ -49,12 +62,22 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
 <div class="top">
   <h1 id="title">VMS · 3 auto</h1>
   <select id="lang" aria-label="Lingua"></select>
-  <button id="help" aria-label="?">?</button>
   <button id="reset">Azzera</button>
+  <button id="gear" class="gear" aria-label="Impostazioni">⚙</button>
 </div>
 <div id="banner" class="banner" hidden></div>
 <div class="cards" id="cards"></div>
 <div id="toast" class="toast"></div>
+
+<!-- impostazioni (ingranaggio): schermata sopra la principale, cosi' i collegamenti Bluetooth restano aperti -->
+<div id="setPage" class="setpage" hidden>
+  <div class="setbar"><button id="setBack">← Indietro</button><h2 id="setTitle">Impostazioni</h2></div>
+  <div class="setcard">
+    <label class="setopt"><input type="checkbox" id="mergeSw"> <span id="mergeLbl"></span></label>
+    <p class="setnote" id="mergeNote"></p>
+  </div>
+  <div class="setcard"><h3 id="helpTitle"></h3><div class="helptxt" id="helpTxt"></div></div>
+</div>
 
 <script>
 (function () {
@@ -102,6 +125,14 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     'toast.busy': ['{0} è già su {1}: spostata qui', '{0} was on {1}: moved here', '{0}은(는) {1}에 있었습니다: 여기로 이동함'],
     rename: ['Nome dell\'auto (es. KIA)', 'Car name (e.g. KIA)', '차량 이름 (예: KIA)'],
     'forget.ask': ['Scollegare la scheda {0} da questo riquadro?', 'Disconnect board {0} from this panel?', '이 패널에서 보드 {0}의 연결을 해제할까요?'],
+    'set.title': ['Impostazioni', 'Settings', '설정'],
+    'set.back': ['← Indietro', '← Back', '← 뒤로'],
+    'set.merge': ['Unisci MULTICONTACT in CONTACT e MULTIIMPACT in IMPACT', 'Merge MULTICONTACT into CONTACT and MULTIIMPACT into IMPACT',
+      'MULTICONTACT를 CONTACT로, MULTIIMPACT를 IMPACT로 합치기'],
+    'set.merge_note': ['Le schede V5 mostrano 5 box: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. Vale per questo telefono (o browser) e resta memorizzata.',
+      'V5 boards show 5 boxes: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. Applies to this phone (or browser) and is remembered.',
+      'V5 보드는 5개 박스를 표시합니다: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. 이 휴대폰(또는 브라우저)에 적용되며 저장됩니다.'],
+    'help.title': ['Come si usa', 'How to use', '사용 방법'],
     nobt: ['Questo browser non ha il Bluetooth. Su Android e PC usa Chrome o Edge; su iPhone/iPad l\'app gratuita Bluefy.',
       'This browser has no Bluetooth. On Android and PC use Chrome or Edge; on iPhone/iPad the free Bluefy app.',
       '이 브라우저는 블루투스를 지원하지 않습니다. Android와 PC에서는 Chrome 또는 Edge, iPhone/iPad에서는 무료 앱 Bluefy를 사용하세요.'],
@@ -123,10 +154,13 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { saved = {}; }
   var sys = (navigator.language || 'it').slice(0, 2).toLowerCase();
   var lang = Math.max(0, LANGS.map(function (l) { return l[0]; }).indexOf(saved.lang || sys));
+  // impostazione dell'ingranaggio: MULTICONTACT dentro CONTACT, MULTIIMPACT dentro IMPACT (indici in CLASSES)
+  var merge = !!saved.merge;
+  var MERGE_TO = { 4: 0, 5: 1 };
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        lang: LANGS[lang][0],
+        lang: LANGS[lang][0], merge: merge,
         slots: slots.map(function (s) { return { car: s.car, id: s.devId, name: s.devName }; })
       }));
     } catch (e) { /* niente */ }
@@ -160,7 +194,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       dev: null, rx: null, tx: null, gen: 0, connected: false, kind: 0,
       stateKey: sv.id ? 'st.repick' : 'st.choose', stateArgs: null,
       count: CLASSES.map(function () { return 0; }), litUntil: CLASSES.map(function () { return 0; }),
-      last: CLASSES.map(function () { return ''; }), tiles: []
+      lastAt: CLASSES.map(function () { return 0; }), last: CLASSES.map(function () { return ''; }), tiles: [], mode: ''
     };
     var card = el('div', 'card');
     var head = el('div', 'head');
@@ -174,6 +208,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     onPress(head, function () { chooseBoard(s); }, function () { forget(s); });
     card.appendChild(head);
     var rows = el('div', 'rows'), row1 = el('div', 'row');
+    s.row1 = row1;
     s.row2 = el('div', 'row');
     CLASSES.forEach(function (c, k) {
       var t = el('div', 'tile');
@@ -205,17 +240,39 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     s.boardEl.textContent = s.devId ? (s.devName || '?') + (s.version ? '  ·  ' + s.version : '') : T('board.none');
     s.stateEl.textContent = T(s.stateKey, s.stateArgs);
     s.dot.className = 'dot k' + s.kind;
-    // V4 (2.x): solo le 4 classi atomiche, salvo eventi V5 arrivati comunque
+    // V4 (2.x): 4 box atomici, salvo eventi V5 arrivati comunque; V5: 7 box, oppure 5 con l'unione attiva
     var v4 = s.version && s.version.charAt(0) !== '5';
     var anyV5 = CLASSES.some(function (c, k) { return c.v5 && s.count[k] > 0; });
-    s.row2.className = 'row' + (v4 && !anyV5 ? ' hide' : '');
+    var mode = v4 && !anyV5 ? 'v4' : (merge ? 'm5' : 'v7');
+    if (mode !== s.mode) layout(s, mode);
     var now = Date.now();
     s.tiles.forEach(function (x, k) {
-      var on = s.litUntil[k] > now;
+      var cnt = s.count[k], lit = s.litUntil[k], at = s.lastAt[k], last = s.last[k];
+      if (merge) {
+        for (var m in MERGE_TO) {
+          if (MERGE_TO[m] !== k) continue;
+          cnt += s.count[m];
+          lit = Math.max(lit, s.litUntil[m]);
+          if (s.lastAt[m] > at) { at = s.lastAt[m]; last = s.last[m]; }
+        }
+      }
+      var on = lit > now;
       if (on !== x.on) { x.on = on; x.t.className = 'tile' + (on ? ' on' : ''); }
-      x.v.textContent = String(s.count[k]);
-      x.l.textContent = s.last[k];
+      x.v.textContent = String(cnt);
+      x.l.textContent = last;
     });
+  }
+
+  // disposizione dei box: v4 = C I P S; v7 = C I P S / MC MI SU; m5 = C I P / S SU
+  function layout(s, mode) {
+    s.mode = mode;
+    var t = s.tiles.map(function (x) { return x.t; });
+    var r1 = mode === 'm5' ? [0, 1, 2] : [0, 1, 2, 3];
+    var r2 = mode === 'm5' ? [3, 6, 4, 5] : [4, 5, 6];
+    r1.forEach(function (k) { s.row1.appendChild(t[k]); });
+    r2.forEach(function (k) { s.row2.appendChild(t[k]); });
+    t[4].style.display = t[5].style.display = mode === 'm5' ? 'none' : '';
+    s.row2.className = 'row' + (mode === 'v4' ? ' hide' : '');
   }
 
   function setState(s, kind, key, args) { s.kind = kind; s.stateKey = key; s.stateArgs = args || null; render(s); }
@@ -327,6 +384,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     if (k < 0) return;
     s.count[k]++;
     s.litUntil[k] = Date.now() + HOLD_MS;
+    s.lastAt[k] = Date.now();
     var d = new Date();
     s.last[k] = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + (p.length >= 4 ? '  ' + p[3] : '');
     render(s);
@@ -343,7 +401,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   }
 
   function clearCounts(s) {
-    for (var k = 0; k < CLASSES.length; k++) { s.count[k] = 0; s.litUntil[k] = 0; s.last[k] = ''; }
+    for (var k = 0; k < CLASSES.length; k++) { s.count[k] = 0; s.litUntil[k] = 0; s.lastAt[k] = 0; s.last[k] = ''; }
   }
 
   // dopo una ricarica: le schede gia' autorizzate si ricollegano da sole dove il browser lo permette
@@ -372,6 +430,13 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     document.getElementById('title').textContent = T('title');
     document.getElementById('reset').textContent = T('reset');
     document.getElementById('lang').setAttribute('aria-label', T('lang'));
+    document.getElementById('gear').setAttribute('aria-label', T('set.title'));
+    document.getElementById('setBack').textContent = T('set.back');
+    document.getElementById('setTitle').textContent = T('set.title');
+    document.getElementById('mergeLbl').textContent = T('set.merge');
+    document.getElementById('mergeNote').textContent = T('set.merge_note');
+    document.getElementById('helpTitle').textContent = T('help.title');
+    document.getElementById('helpTxt').textContent = T('help');
     var b = document.getElementById('banner');
     var msg = !window.isSecureContext ? T('nosecure') : !navigator.bluetooth ? T('nobt') : '';
     b.textContent = msg; b.hidden = !msg;
@@ -396,13 +461,24 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       if (!confirm(T('reset.ask'))) return;
       slots.forEach(function (s) { clearCounts(s); render(s); });
     });
-    document.getElementById('help').addEventListener('click', function () { alert(T('help')); });
+    // ingranaggio: schermata delle impostazioni; il tasto Indietro del telefono la chiude
+    var page = document.getElementById('setPage');
+    document.getElementById('gear').addEventListener('click', function () {
+      page.hidden = false;
+      try { history.pushState({ vmsSet: 1 }, ''); } catch (e) { /* niente */ }
+    });
+    document.getElementById('setBack').addEventListener('click', function () {
+      if (history.state && history.state.vmsSet) history.back(); else page.hidden = true;
+    });
+    window.addEventListener('popstate', function () { page.hidden = true; });
+    var sw = document.getElementById('mergeSw');
+    sw.checked = merge;
+    sw.addEventListener('change', function () { merge = sw.checked; save(); slots.forEach(render); });
     var box = document.getElementById('cards');
     for (var i = 0; i < 3; i++) { slots.push(buildSlot(i)); box.appendChild(slots[i].card); }
     applyLang();
-    setInterval(function () {
-      var now = Date.now();
-      slots.forEach(function (s) { if (s.tiles.some(function (x, k) { return x.on && s.litUntil[k] <= now; })) render(s); });
+    setInterval(function () {   // spegne i box scaduti
+      slots.forEach(function (s) { if (s.tiles.some(function (x) { return x.on; })) render(s); });
     }, 250);
     document.addEventListener('visibilitychange', wake);
     document.addEventListener('pointerdown', wake);
