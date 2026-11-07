@@ -40,6 +40,20 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
 .tile .l{color:var(--mut);font-size:10px;min-height:12px;white-space:nowrap}
 .tile.on{background:var(--c)}
 .tile.on .n,.tile.on .v,.tile.on .l{color:#0a1220}
+/* 1 o 2 riquadri visibili: lo spazio e' di piu', box e scritte piu' grandi */
+.cards.n1 .tile .v{font-size:clamp(34px,10vmin,84px)}
+.cards.n1 .tile .n{font-size:clamp(14px,3.6vmin,26px)}
+.cards.n1 .tile .l{font-size:clamp(11px,2.6vmin,17px);min-height:1.2em}
+.cards.n1 .chip{font-size:24px} .cards.n1 .board{font-size:15px} .cards.n1 .state{font-size:14px}
+.cards.n2 .tile .v{font-size:clamp(26px,6.5vmin,52px)}
+.cards.n2 .tile .n{font-size:clamp(12px,2.8vmin,18px)}
+.cards.n2 .tile .l{font-size:clamp(10px,2vmin,13px)}
+.cards.n2 .chip{font-size:22px}
+/* un solo riquadro su schermo verticale: box su 2 colonne invece di una fila stretta */
+@media (max-aspect-ratio:1/1){
+  .cards.n1 .row{flex-wrap:wrap;align-content:stretch}
+  .cards.n1 .tile{flex:1 1 calc(50% - 6px)}
+}
 .top .gear{width:36px;padding:0;font-size:19px;line-height:1;background:transparent;color:var(--mut);border-color:#1e3050}
 .setpage{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;
   padding:calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))}
@@ -53,7 +67,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
 .setnote{color:var(--mut);font-size:14px;margin:8px 0 0}
 .setcard h3{margin:0 0 6px;font-size:15px;color:var(--bright)}
 .helptxt{white-space:pre-line;font-size:14px;line-height:1.45}
-.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:90vw;
+.showlist{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.showopt{align-items:center}
+.showopt .chip{font-size:17px;padding:2px 10px}
+.showopt .sb{color:var(--mut);font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.toast{z-index:30;position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:90vw;
   background:#222c3c;color:#fff;padding:8px 14px;border-radius:18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
 .toast.show{opacity:1}
 </style>
@@ -72,6 +90,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
 <!-- impostazioni (ingranaggio): schermata sopra la principale, cosi' i collegamenti Bluetooth restano aperti -->
 <div id="setPage" class="setpage" hidden>
   <div class="setbar"><button id="setBack">← Indietro</button><h2 id="setTitle">Impostazioni</h2></div>
+  <div class="setcard">
+    <h3 id="showTitle"></h3>
+    <div class="showlist" id="showList"></div>
+    <p class="setnote" id="showNote"></p>
+  </div>
   <div class="setcard">
     <label class="setopt"><input type="checkbox" id="mergeSw"> <span id="mergeLbl"></span></label>
     <p class="setnote" id="mergeNote"></p>
@@ -132,6 +155,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     'set.merge_note': ['Le schede V5 mostrano 5 box: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. Solo nel riquadro della Ferrari (FER) anche SCRATCH e PERSON finiscono in SUSPICIOUS: 3 box, CONTACT, IMPACT, SUSPICIOUS. Solo nel riquadro della BMW anche SUSPICIOUS finisce in CONTACT: 4 box, CONTACT, IMPACT, PERSON, SCRATCH. Vale per questo telefono (o browser) e resta memorizzata.',
       'V5 boards show 5 boxes: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. In the Ferrari (FER) panel only, SCRATCH and PERSON also go into SUSPICIOUS: 3 boxes, CONTACT, IMPACT, SUSPICIOUS. In the BMW panel only, SUSPICIOUS also goes into CONTACT: 4 boxes, CONTACT, IMPACT, PERSON, SCRATCH. Applies to this phone (or browser) and is remembered.',
       'V5 보드는 5개 박스를 표시합니다: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. 페라리(FER) 패널에서만 SCRATCH와 PERSON도 SUSPICIOUS로 합쳐져 CONTACT, IMPACT, SUSPICIOUS 3개 박스가 됩니다. BMW 패널에서만 SUSPICIOUS도 CONTACT로 합쳐져 CONTACT, IMPACT, PERSON, SCRATCH 4개 박스가 됩니다. 이 휴대폰(또는 브라우저)에 적용되며 저장됩니다.'],
+    'set.show': ['Riquadri da mostrare', 'Panels to show', '표시할 패널'],
+    'set.show_note': ['Togli la spunta per nascondere un\'auto nella schermata principale: lo schermo si divide tra i riquadri rimasti. Un riquadro nascosto resta collegato alla sua scheda e continua a contare gli eventi.',
+      'Untick a car to hide it from the main screen: the screen is shared by the remaining panels. A hidden panel stays connected to its board and keeps counting events.',
+      '체크를 해제하면 메인 화면에서 해당 차량이 숨겨지고, 화면은 남은 패널로 나뉩니다. 숨겨진 패널은 보드와의 연결을 유지하며 이벤트를 계속 셉니다.'],
+    'set.show_min': ['Deve restare almeno un riquadro', 'At least one panel must stay visible', '최소 한 개의 패널은 표시되어야 합니다'],
     'help.title': ['Come si usa', 'How to use', '사용 방법'],
     nobt: ['Questo browser non ha il Bluetooth. Su Android e PC usa Chrome o Edge; su iPhone/iPad l\'app gratuita Bluefy.',
       'This browser has no Bluetooth. On Android and PC use Chrome or Edge; on iPhone/iPad the free Bluefy app.',
@@ -162,10 +190,13 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   var MERGE_FER = { 4: 0, 5: 1, 2: 6, 3: 6 };
   var MERGE_BMW = { 4: 0, 5: 1, 6: 0 };
   function carKey(car) { var c = String(car || '').trim().toUpperCase(); return c === 'FERRARI' ? 'FER' : c; }
+  // impostazione dell'ingranaggio: quali riquadri si vedono (sempre almeno uno; di default tutti e tre)
+  var show = [0, 1, 2].map(function (i) { return !(saved.show && saved.show[i] === false); });
+  if (!show.some(Boolean)) show = [true, true, true];
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        lang: LANGS[lang][0], merge: merge,
+        lang: LANGS[lang][0], merge: merge, show: show,
         slots: slots.map(function (s) { return { car: s.car, id: s.devId, name: s.devName }; })
       }));
     } catch (e) { /* niente */ }
@@ -243,6 +274,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     s.card.style.setProperty('--carfg', cc[1]);
     s.chip.textContent = s.car || '?';
     s.boardEl.textContent = s.devId ? (s.devName || '?') + (s.version ? '  ·  ' + s.version : '') : T('board.none');
+    if (s.showChip) {   // stessa auto nella pagina delle impostazioni
+      s.showChip.textContent = s.car || '?';
+      s.showChip.style.background = cc[0]; s.showChip.style.color = cc[1];
+      s.showBoard.textContent = s.devId ? (s.devName || '?') : T('board.none');
+    }
     s.stateEl.textContent = T(s.stateKey, s.stateArgs);
     s.dot.className = 'dot k' + s.kind;
     // V4 (2.x): 4 box atomici, salvo eventi V5 arrivati comunque; V5: 7 box, oppure 5 con l'unione attiva;
@@ -286,6 +322,29 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   }
 
   function setState(s, kind, key, args) { s.kind = kind; s.stateKey = key; s.stateArgs = args || null; render(s); }
+
+  // riquadri visibili: nascosto = solo non mostrato (collegamento e conteggi continuano);
+  // la classe n1/n2/n3 adatta dimensioni e disposizione allo spazio
+  function applyShow() {
+    var n = 0;
+    slots.forEach(function (s, i) { s.card.style.display = show[i] ? '' : 'none'; if (show[i]) n++; });
+    document.getElementById('cards').className = 'cards n' + n;
+  }
+
+  function buildShowList() {
+    var list = document.getElementById('showList');
+    slots.forEach(function (s, i) {
+      var lab = el('label', 'setopt showopt'), cb = el('input');
+      cb.type = 'checkbox'; cb.checked = show[i];
+      s.showChip = el('span', 'chip'); s.showBoard = el('span', 'sb');
+      lab.appendChild(cb); lab.appendChild(s.showChip); lab.appendChild(s.showBoard);
+      cb.addEventListener('change', function () {
+        if (!cb.checked && show.filter(Boolean).length <= 1) { cb.checked = true; toast(T('set.show_min')); return; }
+        show[i] = cb.checked; save(); applyShow();
+      });
+      list.appendChild(lab);
+    });
+  }
 
   // ------------------------------------------------------------------ Bluetooth
   function chooseBoard(s) {
@@ -445,6 +504,8 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     document.getElementById('setTitle').textContent = T('set.title');
     document.getElementById('mergeLbl').textContent = T('set.merge');
     document.getElementById('mergeNote').textContent = T('set.merge_note');
+    document.getElementById('showTitle').textContent = T('set.show');
+    document.getElementById('showNote').textContent = T('set.show_note');
     document.getElementById('helpTitle').textContent = T('help.title');
     document.getElementById('helpTxt').textContent = T('help');
     var b = document.getElementById('banner');
@@ -486,6 +547,8 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     sw.addEventListener('change', function () { merge = sw.checked; save(); slots.forEach(render); });
     var box = document.getElementById('cards');
     for (var i = 0; i < 3; i++) { slots.push(buildSlot(i)); box.appendChild(slots[i].card); }
+    buildShowList();
+    applyShow();
     applyLang();
     setInterval(function () {   // spegne i box scaduti
       slots.forEach(function (s) { if (s.tiles.some(function (x) { return x.on; })) render(s); });
