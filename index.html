@@ -129,9 +129,9 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     'set.back': ['← Indietro', '← Back', '← 뒤로'],
     'set.merge': ['Unisci MULTICONTACT in CONTACT e MULTIIMPACT in IMPACT', 'Merge MULTICONTACT into CONTACT and MULTIIMPACT into IMPACT',
       'MULTICONTACT를 CONTACT로, MULTIIMPACT를 IMPACT로 합치기'],
-    'set.merge_note': ['Le schede V5 mostrano 5 box: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. Vale per questo telefono (o browser) e resta memorizzata.',
-      'V5 boards show 5 boxes: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. Applies to this phone (or browser) and is remembered.',
-      'V5 보드는 5개 박스를 표시합니다: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. 이 휴대폰(또는 브라우저)에 적용되며 저장됩니다.'],
+    'set.merge_note': ['Le schede V5 mostrano 5 box: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. Solo nel riquadro della Ferrari (FER) anche SCRATCH e PERSON finiscono in SUSPICIOUS: 3 box, CONTACT, IMPACT, SUSPICIOUS. Vale per questo telefono (o browser) e resta memorizzata.',
+      'V5 boards show 5 boxes: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. In the Ferrari (FER) panel only, SCRATCH and PERSON also go into SUSPICIOUS: 3 boxes, CONTACT, IMPACT, SUSPICIOUS. Applies to this phone (or browser) and is remembered.',
+      'V5 보드는 5개 박스를 표시합니다: CONTACT, IMPACT, PERSON, SCRATCH, SUSPICIOUS. 페라리(FER) 패널에서만 SCRATCH와 PERSON도 SUSPICIOUS로 합쳐져 CONTACT, IMPACT, SUSPICIOUS 3개 박스가 됩니다. 이 휴대폰(또는 브라우저)에 적용되며 저장됩니다.'],
     'help.title': ['Come si usa', 'How to use', '사용 방법'],
     nobt: ['Questo browser non ha il Bluetooth. Su Android e PC usa Chrome o Edge; su iPhone/iPad l\'app gratuita Bluefy.',
       'This browser has no Bluetooth. On Android and PC use Chrome or Edge; on iPhone/iPad the free Bluefy app.',
@@ -154,9 +154,12 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { saved = {}; }
   var sys = (navigator.language || 'it').slice(0, 2).toLowerCase();
   var lang = Math.max(0, LANGS.map(function (l) { return l[0]; }).indexOf(saved.lang || sys));
-  // impostazione dell'ingranaggio: MULTICONTACT dentro CONTACT, MULTIIMPACT dentro IMPACT (indici in CLASSES)
+  // impostazione dell'ingranaggio: MULTICONTACT dentro CONTACT, MULTIIMPACT dentro IMPACT (indici in CLASSES);
+  // solo sul riquadro della Ferrari (FER) anche SCRATCH e PERSON dentro SUSPICIOUS: 3 box
   var merge = !!saved.merge;
   var MERGE_TO = { 4: 0, 5: 1 };
+  var MERGE_FER = { 4: 0, 5: 1, 2: 6, 3: 6 };
+  function isFer(car) { var c = String(car || '').trim().toUpperCase(); return c === 'FER' || c === 'FERRARI'; }
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
@@ -240,17 +243,19 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     s.boardEl.textContent = s.devId ? (s.devName || '?') + (s.version ? '  ·  ' + s.version : '') : T('board.none');
     s.stateEl.textContent = T(s.stateKey, s.stateArgs);
     s.dot.className = 'dot k' + s.kind;
-    // V4 (2.x): 4 box atomici, salvo eventi V5 arrivati comunque; V5: 7 box, oppure 5 con l'unione attiva
+    // V4 (2.x): 4 box atomici, salvo eventi V5 arrivati comunque; V5: 7 box, oppure 5 con l'unione attiva;
+    // Ferrari con l'unione attiva: 3 box (C I SU), anche con una scheda V4
     var v4 = s.version && s.version.charAt(0) !== '5';
     var anyV5 = CLASSES.some(function (c, k) { return c.v5 && s.count[k] > 0; });
-    var mode = v4 && !anyV5 ? 'v4' : (merge ? 'm5' : 'v7');
+    var fer = merge && isFer(s.car), mm = fer ? MERGE_FER : MERGE_TO;
+    var mode = fer ? 'm3' : (v4 && !anyV5 ? 'v4' : (merge ? 'm5' : 'v7'));
     if (mode !== s.mode) layout(s, mode);
     var now = Date.now();
     s.tiles.forEach(function (x, k) {
       var cnt = s.count[k], lit = s.litUntil[k], at = s.lastAt[k], last = s.last[k];
       if (merge) {
-        for (var m in MERGE_TO) {
-          if (MERGE_TO[m] !== k) continue;
+        for (var m in mm) {
+          if (mm[m] !== k) continue;
           cnt += s.count[m];
           lit = Math.max(lit, s.litUntil[m]);
           if (s.lastAt[m] > at) { at = s.lastAt[m]; last = s.last[m]; }
@@ -263,16 +268,17 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     });
   }
 
-  // disposizione dei box: v4 = C I P S; v7 = C I P S / MC MI SU; m5 = C I P / S SU
+  // disposizione dei box: v4 = C I P S; v7 = C I P S / MC MI SU; m5 = C I P / S SU; m3 (Ferrari) = C I SU
   function layout(s, mode) {
     s.mode = mode;
     var t = s.tiles.map(function (x) { return x.t; });
-    var r1 = mode === 'm5' ? [0, 1, 2] : [0, 1, 2, 3];
-    var r2 = mode === 'm5' ? [3, 6, 4, 5] : [4, 5, 6];
+    var r1 = mode === 'm5' ? [0, 1, 2] : (mode === 'm3' ? [0, 1, 6] : [0, 1, 2, 3]);
+    var r2 = mode === 'm5' ? [3, 6, 4, 5] : (mode === 'm3' ? [2, 3, 4, 5] : [4, 5, 6]);
+    var hidden = mode === 'm5' ? [4, 5] : (mode === 'm3' ? [2, 3, 4, 5] : []);
     r1.forEach(function (k) { s.row1.appendChild(t[k]); });
     r2.forEach(function (k) { s.row2.appendChild(t[k]); });
-    t[4].style.display = t[5].style.display = mode === 'm5' ? 'none' : '';
-    s.row2.className = 'row' + (mode === 'v4' ? ' hide' : '');
+    t.forEach(function (x, k) { x.style.display = hidden.indexOf(k) >= 0 ? 'none' : ''; });
+    s.row2.className = 'row' + (mode === 'v4' || mode === 'm3' ? ' hide' : '');
   }
 
   function setState(s, kind, key, args) { s.kind = kind; s.stateKey = key; s.stateArgs = args || null; render(s); }
