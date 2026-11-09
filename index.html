@@ -8,7 +8,9 @@
 <!-- VMS 3 Auto (pagina web): stessi riquadri dell'app Android, Bluetooth dal browser (Web Bluetooth).
      Funziona con Chrome/Edge su Android e PC, su iPhone/iPad con il browser Bluefy. Serve https (o localhost).
      Canale eventi NUS 6e400003 della scheda, righe "E,<n>,<CLASSE>,<p>" e "HELLO,RF3,<versione>".
-     Pulsante «Silenzio»: manda CAL:START su 6e400002 e aspetta CAL:END sul canale testo 6e400004 (ascoltato solo in quei secondi). -->
+     Pulsante «Silenzio»: manda CAL:START su 6e400002 e aspetta CAL:END sul canale testo 6e400004 (ascoltato solo in quei secondi).
+     Versione (09/11/2026): HELLO arriva solo al primo iscritto agli eventi; se la Nano della striscia era gia' collegata, dopo
+     1,5 s la pagina manda BOOT? e legge BOOTINFO,RF3,<versione> sul canale testo. Versione sconosciuta = V4 (4 box). -->
 <style>
 :root{--bg:#0a1220;--card:#0f1e35;--tile:#0e1c30;--txt:#e6eef8;--mut:#8aaac8;--bright:#c0d8f0}
 *{box-sizing:border-box}
@@ -247,6 +249,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     var s = {
       i: i, car: sv.car || DEFAULT_CARS[i], devId: sv.id || '', devName: sv.name || '', version: '',
       dev: null, rx: null, tx: null, tc: null, gen: 0, connected: false, kind: 0, calAt: 0, calHeard: false, textBuf: '',
+      verAt: 0, textOn: false,
       stateKey: sv.id ? 'st.repick' : 'st.choose', stateArgs: null,
       count: CLASSES.map(function () { return 0; }), litUntil: CLASSES.map(function () { return 0; }),
       lastAt: CLASSES.map(function () { return 0; }), last: CLASSES.map(function () { return ''; }), tiles: [], mode: ''
@@ -309,9 +312,10 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     s.calBtn.textContent = s.calAt ? T('cal.run', [Math.floor((Date.now() - s.calAt) / 1000)]) : T('cal.btn');
     s.calBtn.className = 'calbtn' + (s.calAt ? ' run' : '');
     s.calBtn.disabled = !s.connected && !s.calAt;
-    // V4 (2.x): 4 box atomici, salvo eventi V5 arrivati comunque; V5: 7 box, oppure 5 con l'unione attiva;
-    // con l'unione attiva: Ferrari 3 box (C I SU), BMW 4 box (C I P S), anche con una scheda V4
-    var v4 = s.version && s.version.charAt(0) !== '5';
+    // V4 (2.x) o versione sconosciuta: 4 box atomici, salvo eventi V5 arrivati comunque; V5 (5.x): 7 box,
+    // oppure 5 con l'unione attiva; con l'unione attiva: Ferrari 3 box (C I SU), BMW 4 box (C I P S), anche con una V4.
+    // Versione sconosciuta = V4 (09/11): la Nano collegata per prima si prende HELLO e la Kia mostrava SUSPICIOUS.
+    var v4 = !s.version || s.version.charAt(0) !== '5';
     var anyV5 = CLASSES.some(function (c, k) { return c.v5 && s.count[k] > 0; });
     var ck = carKey(s.car), fer = merge && ck === 'FER', bmw = merge && ck === 'BMW';
     var mm = fer ? MERGE_FER : (bmw ? MERGE_BMW : MERGE_TO);
@@ -417,7 +421,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       if (s.dev !== dev) return;
       var was = s.connected;
       s.connected = false;
-      s.calAt = 0; s.calHeard = false;
+      s.calAt = 0; s.calHeard = false; s.verAt = 0; s.textOn = false;
       setState(s, 0, was ? 'st.lost' : 'st.unreach');
       retry(s, s.gen);
     };
@@ -434,6 +438,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       try { if (s.dev.gatt.connected) s.dev.gatt.disconnect(); } catch (e) { /* niente */ }
     }
     s.dev = null; s.rx = null; s.tx = null; s.tc = null; s.connected = false; s.calAt = 0; s.calHeard = false;
+    s.verAt = 0; s.textOn = false;
   }
 
   function retry(s, gen) {
@@ -473,6 +478,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
         if (gen !== s.gen) return;
         s.connected = true;
         setState(s, 2, 'st.connected');
+        setTimeout(function () { askVersion(s, gen); }, 1500);   // HELLO non arrivato: la versione si chiede
       });
     }).catch(function (e) {
       if (gen !== s.gen) return;
@@ -485,7 +491,12 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   function onLine(s, gen, line) {
     if (gen !== s.gen) return;
     var p = line.replace(/[\0\r\n]/g, '').trim().split(',');
-    if (p.length >= 3 && p[0] === 'HELLO') { s.version = p[2]; render(s); return; }
+    if (p.length >= 3 && p[0] === 'HELLO') {
+      s.version = p[2];
+      if (s.verAt) { s.verAt = 0; textRelease(s); }
+      render(s);
+      return;
+    }
     if (p.length < 3 || p[0] !== 'E') return;
     var k = -1;
     for (var i = 0; i < CLASSES.length; i++) if (CLASSES[i].wire === p[2]) k = i;
@@ -514,11 +525,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     if (s.calAt) { toast(T('cal.busy', [s.car])); return; }
     if (!s.connected || !s.rx) { toast(T('toast.notconn', [s.car])); return; }
     if (!confirm(T('cal.ask', [s.car]))) return;
-    var gen = s.gen, tc = s.tc;
-    s.calAt = Date.now(); s.calHeard = false; s.textBuf = '';
+    var gen = s.gen;
+    s.calAt = Date.now(); s.calHeard = false;
+    if (!s.verAt) s.textBuf = '';
     render(s);
-    var listen = tc ? tc.startNotifications().then(function () { return true; }, function () { return false; }) : Promise.resolve(false);
-    listen.then(function (heard) {
+    textListen(s).then(function (heard) {
       if (gen !== s.gen || !s.calAt) return;
       s.calHeard = heard;
       var data = enc.encode('CAL:START\n');
@@ -529,21 +540,62 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   }
 
   function onText(s, gen, chunk) {
-    if (gen !== s.gen || !s.calAt) return;
+    if (gen !== s.gen || (!s.calAt && !s.verAt)) return;
     var parts = (s.textBuf + chunk).split('\n');
     s.textBuf = parts.pop().slice(-300);
-    parts.forEach(function (line) {
-      if (line.replace(/[\0\r]/g, '').trim().indexOf('CAL:END') === 0) calDone(s, true);
+    parts.forEach(function (raw) {
+      var line = raw.replace(/[\0\r]/g, '').trim();
+      if (s.calAt && line.indexOf('CAL:END') === 0) calDone(s, true);
+      if (s.verAt && line.indexOf('BOOTINFO,') === 0) {   // BOOTINFO,RF3,<versione>,MODEL=...
+        var p = line.split(',');
+        if (p.length >= 3 && p[1] === 'RF3' && p[2]) s.version = p[2];
+        s.verAt = 0;
+        textRelease(s);
+        render(s);
+      }
     });
   }
 
   function calDone(s, ok) {
     if (!s.calAt) return;
-    var heard = s.calHeard;
-    s.calAt = 0; s.calHeard = false; s.textBuf = '';
-    if (heard && s.tc) s.tc.stopNotifications().catch(function () { /* niente */ });
+    s.calAt = 0; s.calHeard = false;
+    if (!s.verAt) s.textBuf = '';
+    textRelease(s);
     render(s);
     if (ok) toast(T('cal.done', [s.car]));
+  }
+
+  // canale testo (6e400004): acceso solo quando serve (calibrazione, richiesta della versione), poi spento
+  function textListen(s) {
+    if (!s.tc) return Promise.resolve(false);
+    if (s.textOn) return Promise.resolve(true);
+    var gen = s.gen;
+    return s.tc.startNotifications().then(function () {
+      if (gen !== s.gen) return false;
+      s.textOn = true;
+      return true;
+    }, function () { return false; });
+  }
+  function textRelease(s) {
+    if (s.calAt || s.verAt || !s.textOn || !s.tc) return;
+    s.textOn = false;
+    s.tc.stopNotifications().catch(function () { /* niente */ });
+  }
+
+  // versione della scheda: di solito arriva con HELLO quando ci si iscrive agli eventi, ma la scheda lo manda solo al
+  // primo iscritto (la Nano della striscia, se era gia' collegata). Allora si chiede: BOOT? -> BOOTINFO sul canale testo.
+  // Senza risposta entro 6 s si resta senza versione, cioe' V4.
+  function askVersion(s, gen) {
+    if (gen !== s.gen || !s.connected || s.version || s.verAt || !s.rx || !s.tc) return;
+    s.verAt = Date.now();
+    if (!s.calAt) s.textBuf = '';
+    textListen(s).then(function (ok) {
+      if (gen !== s.gen || !s.verAt) return;
+      if (!ok) { s.verAt = 0; return; }
+      var data = enc.encode('BOOT?\n');
+      var w = s.rx.writeValueWithResponse ? s.rx.writeValueWithResponse(data) : s.rx.writeValue(data);
+      w.catch(function () { if (gen === s.gen) { s.verAt = 0; textRelease(s); } });
+    });
   }
 
   // a ogni giro del timer: secondi sul pulsante, fine a tempo senza canale testo, rinuncia dopo 30 s
@@ -635,8 +687,9 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     buildShowList();
     applyShow();
     applyLang();
-    setInterval(function () {   // spegne i box scaduti; calibrazione in corso
+    setInterval(function () {   // spegne i box scaduti; calibrazione in corso; richiesta della versione senza risposta
       slots.forEach(function (s) {
+        if (s.verAt && Date.now() - s.verAt > 6000) { s.verAt = 0; textRelease(s); }
         if (s.calAt) calTick(s);
         else if (s.tiles.some(function (x) { return x.on; })) render(s);
       });
