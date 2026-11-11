@@ -79,6 +79,28 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
 .showopt{align-items:center}
 .showopt .chip{font-size:17px;padding:2px 10px}
 .showopt .sb{color:var(--mut);font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.setlink{display:block;width:100%;text-align:left;background:#1a3560;color:var(--txt);border:1.5px solid #2d5096;border-radius:8px;
+  font-size:16px;font-weight:700;padding:10px 12px;font-family:inherit}
+#thPage{z-index:21}
+.thcars{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.thcar{border:2px solid transparent;border-radius:8px;font-size:17px;font-weight:800;padding:6px 14px;font-family:inherit;opacity:.45}
+.thcar.sel{opacity:1;border-color:#fff}
+.thbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.thbtns button{flex:1 1 auto;background:#1a3560;color:var(--txt);border:1.5px solid #2d5096;border-radius:8px;font-size:15px;font-weight:700;
+  min-height:42px;padding:0 12px;font-family:inherit}
+.thbtns button.go{background:#1d6b35;border-color:#2DC653}
+.thmsg{color:var(--bright);font-size:14px;margin:8px 0 0;min-height:1.3em}
+.thgrp{margin:14px 0 4px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.thgrp:first-child{margin-top:0}
+.throw{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #1e3050}
+.throw .tl{flex:1 1 auto;min-width:0;font-size:15px;font-weight:700}
+.throw .ts{display:block;color:var(--mut);font-size:12px;font-weight:400}
+.throw button{flex:none;width:40px;height:40px;background:#1a3560;color:var(--txt);border:1.5px solid #2d5096;border-radius:8px;font-size:22px;
+  line-height:1;padding:0;font-family:inherit}
+.throw input{flex:none;width:76px;height:40px;background:#0b1626;color:var(--txt);border:1.5px solid #2d5096;border-radius:8px;font-size:17px;
+  text-align:center;font-family:inherit}
+.throw.chg input{border-color:#f5c400;color:#f5c400}
+.throw.chg .ts{color:#f5c400}
 .toast{z-index:30;position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:90vw;
   background:#222c3c;color:#fff;padding:8px 14px;border-radius:18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
 .toast.show{opacity:1}
@@ -107,7 +129,23 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     <label class="setopt"><input type="checkbox" id="mergeSw"> <span id="mergeLbl"></span></label>
     <p class="setnote" id="mergeNote"></p>
   </div>
+  <div class="setcard">
+    <button id="thOpen" class="setlink"></button>
+    <p class="setnote" id="thOpenNote"></p>
+  </div>
   <div class="setcard"><h3 id="helpTitle"></h3><div class="helptxt" id="helpTxt"></div></div>
+</div>
+
+<!-- soglie (11/11/2026): lette dalla scheda con P?, ritoccate qui, mandate con P:<nome>=<valore> -->
+<div id="thPage" class="setpage" hidden>
+  <div class="setbar"><button id="thBack"></button><h2 id="thTitle"></h2></div>
+  <div class="setcard">
+    <div class="thcars" id="thCars"></div>
+    <div class="thbtns"><button id="thRead"></button><button id="thSend" class="go"></button><button id="thDef"></button></div>
+    <p class="thmsg" id="thMsg"></p>
+  </div>
+  <div class="setcard" id="thListCard"><div id="thList"></div></div>
+  <div class="setcard"><p class="setnote" id="thNote" style="margin:0"></p></div>
 </div>
 
 <script>
@@ -159,6 +197,40 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     'toast.busy': ['{0} è già su {1}: spostata qui', '{0} was on {1}: moved here', '{0}은(는) {1}에 있었습니다: 여기로 이동함'],
     'st.mute': ['MUTO: eventi ignorati finché tieni premuto', 'MUTED: events ignored while you hold', '음소거: 누르고 있는 동안 이벤트 무시'],
     'st.mute_tail': ['muto: ancora {0} s', 'muted: {0} s more', '음소거: {0}초 남음'],
+    'th.open': ['Soglie delle schede  →', 'Board thresholds  →', '보드 임계값  →'],
+    'th.open_note': ['Legge le soglie dalla scheda, le ritocchi e le rimandi alla scheda.', 'Reads the thresholds from the board; you adjust them and send them back.', '보드에서 임계값을 읽고, 조정한 뒤 보드로 다시 보냅니다.'],
+    'th.title': ['Soglie', 'Thresholds', '임계값'],
+    'th.read': ['Leggi dalla scheda', 'Read from board', '보드에서 읽기'],
+    'th.send': ['Invia alla scheda ({0})', 'Send to board ({0})', '보드로 보내기 ({0})'],
+    'th.def': ['Valori iniziali', 'Initial values', '초기값'],
+    'th.empty': ['Scegli l\'auto e tocca «Leggi dalla scheda».', 'Choose the car and tap “Read from board”.', '차량을 선택하고 «보드에서 읽기»를 누르세요.'],
+    'th.reading': ['{0}: leggo le soglie...', '{0}: reading thresholds...', '{0}: 임계값 읽는 중...'],
+    'th.got': ['{0}: {1} soglie lette dalla scheda', '{0}: {1} thresholds read from the board', '{0}: 보드에서 임계값 {1}개를 읽었습니다'],
+    'th.noreply': ['{0}: la scheda non ha risposto', '{0}: the board did not answer', '{0}: 보드가 응답하지 않았습니다'],
+    'th.notext': ['{0}: la scheda non ha il canale testo, le soglie non si possono leggere', '{0}: the board has no text channel, thresholds cannot be read', '{0}: 보드에 텍스트 채널이 없어 임계값을 읽을 수 없습니다'],
+    'th.fail': ['{0}: invio non riuscito, riprova', '{0}: sending failed, try again', '{0}: 전송 실패, 다시 시도하세요'],
+    'th.busy': ['{0}: aspetta, sto ancora parlando con la scheda', '{0}: wait, still talking to the board', '{0}: 잠시만요, 아직 보드와 통신 중입니다'],
+    'th.none': ['Nessuna soglia modificata: niente da inviare', 'No threshold changed: nothing to send', '변경된 임계값이 없습니다: 보낼 것이 없습니다'],
+    'th.ask': ['Inviare {1} soglie alla scheda {0}?', 'Send {1} thresholds to the {0} board?', '{0} 보드로 임계값 {1}개를 보낼까요?'],
+    'th.sending': ['{0}: invio {1} soglie...', '{0}: sending {1} thresholds...', '{0}: 임계값 {1}개 전송 중...'],
+    'th.ok': ['{0}: {1} soglie inviate, la scheda le conferma', '{0}: {1} thresholds sent, confirmed by the board', '{0}: 임계값 {1}개 전송됨, 보드가 확인했습니다'],
+    'th.bad': ['{0}: la scheda NON conferma: {1}', '{0}: the board does NOT confirm: {1}', '{0}: 보드가 확인하지 않음: {1}'],
+    'th.defask': ['Riportare la scheda {0} ai valori iniziali del firmware?', 'Put the {0} board back to the firmware initial values?', '{0} 보드를 펌웨어 초기값으로 되돌릴까요?'],
+    'th.defok': ['{0}: valori iniziali ripristinati', '{0}: initial values restored', '{0}: 초기값으로 복원되었습니다'],
+    'th.was': ['sulla scheda: {0}', 'on the board: {0}', '보드 값: {0}'],
+    'th.note': ['Le modifiche valgono subito e restano finché la scheda è alimentata: togliendo l\'alimentazione tornano i valori iniziali del firmware. Giallo = valore modificato e non ancora inviato.',
+      'Changes apply at once and last while the board is powered: after a power cycle the firmware initial values come back. Yellow = changed and not sent yet.',
+      '변경 사항은 즉시 적용되며 보드에 전원이 공급되는 동안 유지됩니다. 전원을 껐다 켜면 펌웨어 초기값으로 돌아갑니다. 노란색 = 변경되었지만 아직 전송되지 않은 값.'],
+    'thg.det': ['Rilevatore', 'Detector', '감지기'],
+    'thg.gate': ['Gate generale (evento vero o disturbo)', 'General gate (real event or disturbance)', '일반 게이트 (실제 이벤트 또는 방해)'],
+    'thg.prob': ['Probabilità minima della classe', 'Minimum class probability', '클래스 최소 확률'],
+    'thg.v5': ['Soglie V5 (episodi)', 'V5 thresholds (episodes)', 'V5 임계값 (에피소드)'],
+    'thg.other': ['Altre', 'Other', '기타'],
+    'thp.acc_on': ['Accelerometro', 'Accelerometer', '가속도계'],
+    'thp.vib_on': ['Microfono vibrazione', 'Vibration microphone', '진동 마이크'],
+    'thp.air_on': ['Microfono aria', 'Air microphone', '공기 마이크'],
+    'thp.sep': ['Separazione tra eventi (s)', 'Separation between events (s)', '이벤트 간 간격 (초)'],
+    'thp.tau_scratch': ['Gate SCRATCH', 'SCRATCH gate', 'SCRATCH 게이트'],
     'cal.btn': ['Silenzio', 'Silence', '무음 보정'],
     'cal.run': ['Silenzio {0} s', 'Silence {0} s', '무음 보정 {0}초'],
     'st.cal': ['calibrazione del silenzio: non toccare l\'auto', 'silence calibration: do not touch the car', '무음 보정 중: 차량을 만지지 마세요'],
@@ -253,7 +325,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     var s = {
       i: i, car: sv.car || DEFAULT_CARS[i], devId: sv.id || '', devName: sv.name || '', version: '',
       dev: null, rx: null, tx: null, tc: null, gen: 0, connected: false, kind: 0, calAt: 0, calHeard: false, textBuf: '',
-      verAt: 0, textOn: false, muteHeld: false, muteTail: 0, muteSent: 0,
+      verAt: 0, textOn: false, parAt: 0, parThen: null, parSending: false, params: null, muteHeld: false, muteTail: 0, muteSent: 0,
       stateKey: sv.id ? 'st.repick' : 'st.choose', stateArgs: null,
       count: CLASSES.map(function () { return 0; }), litUntil: CLASSES.map(function () { return 0; }),
       lastAt: CLASSES.map(function () { return 0; }), last: CLASSES.map(function () { return ''; }), tiles: [], mode: ''
@@ -467,7 +539,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       if (s.dev !== dev) return;
       var was = s.connected;
       s.connected = false;
-      s.calAt = 0; s.calHeard = false; s.verAt = 0; s.textOn = false; s.muteHeld = false;
+      s.calAt = 0; s.calHeard = false; s.verAt = 0; s.textOn = false; s.muteHeld = false; s.parAt = 0; s.parThen = null; s.parSending = false;
       setState(s, 0, was ? 'st.lost' : 'st.unreach');
       retry(s, s.gen);
     };
@@ -484,7 +556,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       try { if (s.dev.gatt.connected) s.dev.gatt.disconnect(); } catch (e) { /* niente */ }
     }
     s.dev = null; s.rx = null; s.tx = null; s.tc = null; s.connected = false; s.calAt = 0; s.calHeard = false;
-    s.verAt = 0; s.textOn = false;
+    s.verAt = 0; s.textOn = false; s.parAt = 0; s.parThen = null; s.parSending = false; s.params = null;
   }
 
   function retry(s, gen) {
@@ -574,7 +646,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     if (!confirm(T('cal.ask', [s.car]))) return;
     var gen = s.gen;
     s.calAt = Date.now(); s.calHeard = false;
-    if (!s.verAt) s.textBuf = '';
+    if (!s.verAt && !s.parAt) s.textBuf = '';
     render(s);
     textListen(s).then(function (heard) {
       if (gen !== s.gen || !s.calAt) return;
@@ -587,12 +659,13 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   }
 
   function onText(s, gen, chunk) {
-    if (gen !== s.gen || (!s.calAt && !s.verAt)) return;
+    if (gen !== s.gen || (!s.calAt && !s.verAt && !s.parAt)) return;
     var parts = (s.textBuf + chunk).split('\n');
-    s.textBuf = parts.pop().slice(-300);
+    s.textBuf = parts.pop().slice(s.parAt ? -3000 : -300);   // la riga P delle soglie e' lunga ~600 caratteri
     parts.forEach(function (raw) {
       var line = raw.replace(/[\0\r]/g, '').trim();
       if (s.calAt && line.indexOf('CAL:END') === 0) calDone(s, true);
+      if (s.parAt && line.indexOf('P,') === 0) gotParams(s, line);
       if (s.verAt && line.indexOf('BOOTINFO,') === 0) {   // BOOTINFO,RF3,<versione>,MODEL=...
         var p = line.split(',');
         if (p.length >= 3 && p[1] === 'RF3' && p[2]) s.version = p[2];
@@ -606,7 +679,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   function calDone(s, ok) {
     if (!s.calAt) return;
     s.calAt = 0; s.calHeard = false;
-    if (!s.verAt) s.textBuf = '';
+    if (!s.verAt && !s.parAt) s.textBuf = '';
     textRelease(s);
     render(s);
     if (ok) toast(T('cal.done', [s.car]));
@@ -624,7 +697,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     }, function () { return false; });
   }
   function textRelease(s) {
-    if (s.calAt || s.verAt || !s.textOn || !s.tc) return;
+    if (s.calAt || s.verAt || s.parAt || !s.textOn || !s.tc) return;
     s.textOn = false;
     s.tc.stopNotifications().catch(function () { /* niente */ });
   }
@@ -635,7 +708,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
   function askVersion(s, gen) {
     if (gen !== s.gen || !s.connected || s.version || s.verAt || !s.rx || !s.tc) return;
     s.verAt = Date.now();
-    if (!s.calAt) s.textBuf = '';
+    if (!s.calAt && !s.parAt) s.textBuf = '';
     textListen(s).then(function (ok) {
       if (gen !== s.gen || !s.verAt) return;
       if (!ok) { s.verAt = 0; return; }
@@ -643,6 +716,139 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
       var w = s.rx.writeValueWithResponse ? s.rx.writeValueWithResponse(data) : s.rx.writeValue(data);
       w.catch(function () { if (gen === s.gen) { s.verAt = 0; textRelease(s); } });
     });
+  }
+
+  // ------------------------------------------------------------------ soglie (parametri a caldo del firmware)
+  // P? -> riga "P,<nome>=<valore>|<min>|<max>|<passo>;..." sul canale testo; P:<nome>=<valore> cambia un valore;
+  // P:DEFAULT riporta ai valori del firmware e rimanda la riga P. I comandi si mandano a pezzi di 20 byte (la scheda
+  // ricompone la riga fino al fine riga), cosi' passano anche senza MTU allargato.
+  var PAR_MS = 5000, thIdx = 0, thText = '';
+  var TH_GROUPS = [['thg.det', ['acc_on', 'vib_on', 'air_on', 'sep']], ['thg.gate', ['g_contact', 'g_impact', 'g_person', 'g_scratch', 'tau_scratch']],
+    ['thg.prob', ['p_contact', 'p_impact', 'p_person', 'p_scratch']], ['thg.v5', ['p_multicontact', 'p_multiimpact', 'p_suspicious']]];
+  var TH_HIDE = ['mode'];
+  function sendLine(s, str) {
+    var d = enc.encode(str), p = Promise.resolve();
+    for (var i = 0; i < d.length; i += 20) (function (c) {
+      p = p.then(function () { return s.rx.writeValueWithResponse ? s.rx.writeValueWithResponse(c) : s.rx.writeValue(c); });
+    })(d.slice(i, i + 20));
+    return p;
+  }
+  function thSay(msg) { thText = msg || ''; document.getElementById('thMsg').textContent = thText; }
+  function num(v) { return String(+(+v).toFixed(4)); }
+  function parChanged(p) { return Math.abs(p.val - p.cur) > 1e-6; }
+  function parLabel(name) {
+    if (D['thp.' + name]) return T('thp.' + name);
+    var m = /^[gp]_(.+)$/.exec(name);
+    return m ? m[1].toUpperCase() : name;
+  }
+  // chiede la riga P alla scheda (cmd = 'P?' oppure 'P:DEFAULT'); then(vecchi) quando arriva
+  function askParams(s, cmd, then) {
+    if (!s.connected || !s.rx) { thSay(T('toast.notconn', [s.car])); return; }
+    if (!s.tc) { thSay(T('th.notext', [s.car])); return; }
+    if (s.parAt || s.parSending) { thSay(T('th.busy', [s.car])); return; }
+    var gen = s.gen;
+    s.parAt = Date.now(); s.parThen = then || null;
+    if (!s.calAt && !s.verAt) s.textBuf = '';
+    thSay(T('th.reading', [s.car]));
+    textListen(s).then(function (ok) {
+      if (gen !== s.gen || !s.parAt) return;
+      if (!ok) { s.parAt = 0; s.parThen = null; thSay(T('th.notext', [s.car])); return; }
+      sendLine(s, cmd + '\n').catch(function () {
+        if (gen !== s.gen) return;
+        s.parAt = 0; s.parThen = null; textRelease(s); thSay(T('th.fail', [s.car]));
+      });
+    });
+  }
+  function gotParams(s, line) {
+    var list = [];
+    line.slice(2).split(';').forEach(function (it) {
+      var eq = it.indexOf('='), f = it.slice(eq + 1).split('|').map(Number);
+      if (eq < 1 || f.length < 4 || f.some(isNaN)) return;
+      list.push({ name: it.slice(0, eq), cur: f[0], val: f[0], min: f[1], max: f[2], step: f[3] > 0 ? f[3] : 0.01 });
+    });
+    if (!list.length) return;   // riga rovinata: si aspetta la scadenza
+    var then = s.parThen;
+    s.parAt = 0; s.parThen = null;
+    textRelease(s);
+    s.params = list;
+    if (then) then(); else thSay(T('th.got', [s.car, list.filter(function (p) { return TH_HIDE.indexOf(p.name) < 0; }).length]));
+    thRender();
+  }
+  function sendParams(s) {
+    if (!s.connected || !s.rx) { thSay(T('toast.notconn', [s.car])); return; }
+    if (s.parAt || s.parSending) { thSay(T('th.busy', [s.car])); return; }
+    var ch = (s.params || []).filter(parChanged).map(function (p) { return { name: p.name, val: p.val }; });
+    if (!ch.length) { thSay(T('th.none')); return; }
+    if (!confirm(T('th.ask', [s.car, ch.length]))) return;
+    var gen = s.gen, q = Promise.resolve();
+    s.parSending = true;
+    thSay(T('th.sending', [s.car, ch.length]));
+    ch.forEach(function (c) { q = q.then(function () { return sendLine(s, 'P:' + c.name + '=' + num(c.val) + '\n'); }); });
+    q.then(function () {
+      if (gen !== s.gen) return;
+      s.parSending = false;
+      askParams(s, 'P?', function () {   // rilettura: vale quello che la scheda dichiara
+        var bad = ch.filter(function (c) {
+          var p = s.params.filter(function (x) { return x.name === c.name; })[0];
+          return !p || Math.abs(p.cur - c.val) > 1e-4;
+        }).map(function (c) { return c.name; });
+        thSay(bad.length ? T('th.bad', [s.car, bad.join(', ')]) : T('th.ok', [s.car, ch.length]));
+      });
+    }, function () {
+      if (gen !== s.gen) return;
+      s.parSending = false; thSay(T('th.fail', [s.car]));
+    });
+  }
+  function thCount() {
+    var s = slots[thIdx], n = s && s.params ? s.params.filter(parChanged).length : 0;
+    document.getElementById('thSend').textContent = T('th.send', [n]);
+  }
+  function thRow(p) {
+    var row = el('div', 'throw'), tl = el('div', 'tl', parLabel(p.name)), ts = el('span', 'ts');
+    var minus = el('button', '', '−'), inp = el('input'), plus = el('button', '', '+');
+    inp.type = 'number'; inp.inputMode = 'decimal'; inp.min = p.min; inp.max = p.max; inp.step = p.step; inp.value = num(p.val);
+    tl.appendChild(ts);
+    function mark() {
+      row.className = 'throw' + (parChanged(p) ? ' chg' : '');
+      ts.textContent = p.name + '  ·  ' + num(p.min) + '–' + num(p.max) + (parChanged(p) ? '  ·  ' + T('th.was', [num(p.cur)]) : '');
+      thCount();
+    }
+    function set(v, fromInput) {
+      if (isNaN(v)) v = p.cur;
+      p.val = Math.min(p.max, Math.max(p.min, +v.toFixed(4)));
+      if (!fromInput || p.val !== v) inp.value = num(p.val);
+      mark();
+    }
+    function nudge(dir) { set(Math.round((p.val + dir * p.step) / p.step) * p.step, false); }
+    minus.addEventListener('click', function () { nudge(-1); });
+    plus.addEventListener('click', function () { nudge(1); });
+    inp.addEventListener('change', function () { set(parseFloat(String(inp.value).replace(',', '.')), false); });
+    row.appendChild(tl); row.appendChild(minus); row.appendChild(inp); row.appendChild(plus);
+    mark();
+    return row;
+  }
+  function thRender() {
+    var cars = document.getElementById('thCars'), list = document.getElementById('thList');
+    cars.textContent = ''; list.textContent = '';
+    slots.forEach(function (s, i) {
+      var b = el('button', 'thcar' + (i === thIdx ? ' sel' : ''), s.car), cc = carColor(s.car);
+      b.style.background = cc[0]; b.style.color = cc[1];
+      b.addEventListener('click', function () { thIdx = i; thSay(''); thRender(); });
+      cars.appendChild(b);
+    });
+    var s = slots[thIdx];
+    if (!s.params) list.appendChild(el('p', 'setnote', T('th.empty')));
+    else {
+      var used = TH_HIDE.slice();
+      TH_GROUPS.concat([['thg.other', null]]).forEach(function (g) {
+        var ps = s.params.filter(function (p) { return g[1] ? g[1].indexOf(p.name) >= 0 : used.indexOf(p.name) < 0; });
+        if (!ps.length) return;
+        list.appendChild(el('div', 'thgrp', T(g[0])));
+        ps.forEach(function (p) { used.push(p.name); list.appendChild(thRow(p)); });
+      });
+    }
+    list.firstChild.style.marginTop = '0';
+    thCount();
   }
 
   // a ogni giro del timer: secondi sul pulsante, fine a tempo senza canale testo, rinuncia dopo 30 s
@@ -690,6 +896,14 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     document.getElementById('mergeNote').textContent = T('set.merge_note');
     document.getElementById('showTitle').textContent = T('set.show');
     document.getElementById('showNote').textContent = T('set.show_note');
+    document.getElementById('thOpen').textContent = T('th.open');
+    document.getElementById('thOpenNote').textContent = T('th.open_note');
+    document.getElementById('thBack').textContent = T('set.back');
+    document.getElementById('thTitle').textContent = T('th.title');
+    document.getElementById('thRead').textContent = T('th.read');
+    document.getElementById('thDef').textContent = T('th.def');
+    document.getElementById('thNote').textContent = T('th.note');
+    if (slots.length) thRender();
     document.getElementById('helpTitle').textContent = T('help.title');
     document.getElementById('helpTxt').textContent = T('help');
     var b = document.getElementById('banner');
@@ -725,7 +939,31 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     document.getElementById('setBack').addEventListener('click', function () {
       if (history.state && history.state.vmsSet) history.back(); else page.hidden = true;
     });
-    window.addEventListener('popstate', function () { page.hidden = true; });
+    var thPage = document.getElementById('thPage');
+    function showPages() {   // 1 = impostazioni, 2 = soglie sopra le impostazioni
+      var lv = history.state && history.state.vmsSet ? history.state.vmsSet : 0;
+      page.hidden = lv < 1; thPage.hidden = lv < 2;
+    }
+    window.addEventListener('popstate', showPages);
+    document.getElementById('thOpen').addEventListener('click', function () {
+      var first = -1;
+      slots.forEach(function (s, i) { if (first < 0 && s.connected && show[i]) first = i; });
+      if (!slots[thIdx].connected && first >= 0) thIdx = first;
+      thSay(''); thRender();
+      thPage.hidden = false;
+      try { history.pushState({ vmsSet: 2 }, ''); } catch (e) { /* niente */ }
+    });
+    document.getElementById('thBack').addEventListener('click', function () {
+      if (history.state && history.state.vmsSet === 2) history.back(); else thPage.hidden = true;
+    });
+    document.getElementById('thRead').addEventListener('click', function () { askParams(slots[thIdx], 'P?'); });
+    document.getElementById('thSend').addEventListener('click', function () { sendParams(slots[thIdx]); });
+    document.getElementById('thDef').addEventListener('click', function () {
+      var s = slots[thIdx];
+      if (!s.connected || !s.rx) { thSay(T('toast.notconn', [s.car])); return; }
+      if (!confirm(T('th.defask', [s.car]))) return;
+      askParams(s, 'P:DEFAULT', function () { thSay(T('th.defok', [s.car])); });
+    });
     var sw = document.getElementById('mergeSw');
     sw.checked = merge;
     sw.addEventListener('change', function () { merge = sw.checked; save(); slots.forEach(render); });
@@ -737,6 +975,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;gap:6px;
     setInterval(function () {   // spegne i box scaduti; calibrazione in corso; richiesta della versione senza risposta
       slots.forEach(function (s) {
         if (s.verAt && Date.now() - s.verAt > 6000) { s.verAt = 0; textRelease(s); }
+        if (s.parAt && Date.now() - s.parAt > PAR_MS) { s.parAt = 0; s.parThen = null; textRelease(s); if (slots[thIdx] === s) thSay(T('th.noreply', [s.car])); }
         if (s.muteHeld && Date.now() - s.muteSent >= MUTE_SEND_MS) muteSend(s, true);
         if (s.muteHeld || s.muteTail) { if (!s.muteHeld && Date.now() > s.muteTail) s.muteTail = 0; render(s); }
         if (s.calAt) calTick(s);
